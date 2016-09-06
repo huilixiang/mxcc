@@ -146,7 +146,7 @@ func (r *RebateChaincode) download(stub *shim.ChaincodeStub, args []string) ([]b
 	//应该提供app与软件供应商的对应关系，找到支付人，此处简单的模拟
 	callArgs[0] = curTXID
 	callArgs[1] = fmt.Sprintf("%d", LastFour)
-	callArgs[2] = "payer_0"
+	callArgs[2] = "payer_a"
 	_, err = r.rebate(stub, callArgs)
 	if err != nil {
 		return nil, err
@@ -243,7 +243,6 @@ func (r *RebateChaincode) rebate(stub *shim.ChaincodeStub, args []string) ([]byt
 		if len(payee) < 1 {
 			break
 		}
-		rebateLogger.Warningf("rebate user:[%s], money:[%d]", payee, 10)
 		//给用户转帐
 		payeeKey := payeePrefix + payee
 		payeeBalanceBytes, err := stub.GetState(payeeKey)
@@ -258,6 +257,7 @@ func (r *RebateChaincode) rebate(stub *shim.ChaincodeStub, args []string) ([]byt
 				return nil, err
 			}
 		}
+		rebateLogger.Warningf("before rebating payee:[%s]`s balance:[%d], money:[%d]", payee, payeeBalance, rebateMoney)
 		balance = balance - rebateMoney
 		payeeBalance = payeeBalance + rebateMoney
 		err = stub.PutState(payeeKey, []byte(strconv.Itoa(payeeBalance)))
@@ -265,9 +265,8 @@ func (r *RebateChaincode) rebate(stub *shim.ChaincodeStub, args []string) ([]byt
 			rebateLogger.Warningf("payer:[%s] rebate:[%d] to payee:[%s] err:[%s]", payerID, rebateMoney, payee, err)
 			return nil, err
 		}
-		rebateLogger.Debugf("payer:[%s] rebate:[%d] to payee:[%s], balance:[%d]", payerID, rebateMoney, payee, balance)
+		rebateLogger.Warningf("payer:[%s] rebate:[%d] to payee:[%s], balance:[%d]", payerID, rebateMoney, payee, balance)
 	}
-
 	err = stub.PutState(payerPrefix+payerID, []byte(strconv.Itoa(balance)))
 	if err != nil {
 		return nil, err
@@ -340,6 +339,7 @@ func (r *RebateChaincode) findLastN(stub *shim.ChaincodeStub, rightTxID string, 
 		key = shareTXPrefix + prevTx
 		i++
 	}
+	rebateLogger.Warningf("baneift users:[%v]", payees)
 	return payees, nil
 }
 
