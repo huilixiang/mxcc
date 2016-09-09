@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	//"reflect"
 	"strconv"
 	"strings"
@@ -12,7 +14,6 @@ import (
 	//"github.com/golang/protobuf/proto"
 	//"github.com/hyperledger/fabric/core/util"
 	//"github.com/hyperledger/fabric/protos"
-	"github.com/op/go-logging"
 )
 
 var shareTXPrefix = "USTX_"
@@ -20,7 +21,9 @@ var downloadTXPrefix = "UDTX_"
 var payerPrefix = "PAYER_"
 var payeePrefix = "PAYEE_"
 
-var rebateLogger = logging.MustGetLogger("rebate")
+//var rebateLogger = logging.MustGetLogger("rebate")
+var buf bytes.Buffer
+var rebateLogger = log.New(&buf, "rebateLogger: ", log.Lshortfile)
 
 //type BonusType int
 
@@ -61,10 +64,10 @@ func (r *RebateChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		}
 	} else if "share" == function {
 		ret, err := r.share(ccStub, args)
-		rebateLogger.Debugf("share ret:[%s], err:[%s]", ret, err)
+		rebateLogger.Printf("share ret:[%s], err:[%s]", ret, err)
 	} else if "download" == function {
 		ret, err := r.download(ccStub, args)
-		rebateLogger.Debugf("download ret:[%s], err:[%s]", ret, err)
+		rebateLogger.Printf("download ret:[%s], err:[%s]", ret, err)
 	}
 	return nil, nil
 }
@@ -82,7 +85,7 @@ func (r *RebateChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		if err != nil {
 			return nil, err
 		}
-		rebateLogger.Warningf("payer:[%s]`s balance:[%d]", payerID, balance)
+		rebateLogger.Printf("payer:[%s]`s balance:[%d]", payerID, balance)
 		return []byte(strconv.Itoa(balance)), nil
 	} else if "payeeBalance" == function {
 		payeeID := args[0]
@@ -90,7 +93,7 @@ func (r *RebateChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		if err != nil {
 			return nil, err
 		}
-		rebateLogger.Debugf("payee:[%s]`s balance:[%d]", payeeID, balance)
+		rebateLogger.Printf("payee:[%s]`s balance:[%d]", payeeID, balance)
 		return []byte(strconv.Itoa(balance)), nil
 	} else if "shareTX" == function {
 		txID := args[0]
@@ -98,7 +101,7 @@ func (r *RebateChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		if err != nil {
 			return nil, err
 		}
-		rebateLogger.Debugf("share tx:[%s]`s detail:[%s].", txID, string(txBytes))
+		rebateLogger.Printf("share tx:[%s]`s detail:[%s].", txID, string(txBytes))
 		return txBytes, nil
 	} else if "downloadTX" == function {
 		txID := args[0]
@@ -106,7 +109,7 @@ func (r *RebateChaincode) Query(stub shim.ChaincodeStubInterface, function strin
 		if err != nil {
 			return nil, err
 		}
-		rebateLogger.Debugf("download tx:[%s]`s detail:[%s].", txID, string(txBytes))
+		rebateLogger.Printf("download tx:[%s]`s detail:[%s].", txID, string(txBytes))
 		return txBytes, nil
 
 	}
@@ -140,7 +143,7 @@ func (r *RebateChaincode) download(stub *shim.ChaincodeStub, args []string) ([]b
 	if err != nil {
 		return nil, fmt.Errorf("stub.PutState error: [%s]", err)
 	}
-	rebateLogger.Debugf("share success, json:[%s]", jsonStr)
+	rebateLogger.Printf("share success, json:[%s]", jsonStr)
 	//调用返利处理函数。此处只是demo阶段，应该有一条单独的链来做这项工作
 	callArgs := make([]string, 3)
 	//应该提供app与软件供应商的对应关系，找到支付人，此处简单的模拟
@@ -180,7 +183,7 @@ func (r *RebateChaincode) share(stub *shim.ChaincodeStub, args []string) ([]byte
 	if err != nil {
 		return nil, fmt.Errorf("stub.PutState error: [%s]", err)
 	}
-	rebateLogger.Debugf("share success, json:[%s]", jsonStr)
+	rebateLogger.Printf("share success, json:[%s]", jsonStr)
 	return nil, nil
 }
 
@@ -200,7 +203,7 @@ func (r *RebateChaincode) payerDeposit(stub *shim.ChaincodeStub, args []string) 
 	if amount < 1 {
 		return nil, errors.New("Invalid arguments. deposit amount must be positive	integer")
 	}
-	rebateLogger.Debugf("payer:[%s] deposit:[%d] invoked", payerID, amount)
+	rebateLogger.Printf("payer:[%s] deposit:[%d] invoked", payerID, amount)
 	balance, err := r.getPayerBalance(stub, payerID)
 	if err != nil {
 		return nil, err
@@ -247,7 +250,7 @@ func (r *RebateChaincode) rebate(stub *shim.ChaincodeStub, args []string) ([]byt
 		payeeKey := payeePrefix + payee
 		payeeBalanceBytes, err := stub.GetState(payeeKey)
 		if err != nil {
-			rebateLogger.Warningf("getting payee:[%s]`s balance err:[%s]", payee, err)
+			rebateLogger.Printf("getting payee:[%s]`s balance err:[%s]", payee, err)
 			continue
 		}
 		payeeBalance := 0
@@ -257,15 +260,15 @@ func (r *RebateChaincode) rebate(stub *shim.ChaincodeStub, args []string) ([]byt
 				return nil, err
 			}
 		}
-		rebateLogger.Warningf("before rebating payee:[%s]`s balance:[%d], money:[%d]", payee, payeeBalance, rebateMoney)
+		rebateLogger.Printf("before rebating payee:[%s]`s balance:[%d], money:[%d]", payee, payeeBalance, rebateMoney)
 		balance = balance - rebateMoney
 		payeeBalance = payeeBalance + rebateMoney
 		err = stub.PutState(payeeKey, []byte(strconv.Itoa(payeeBalance)))
 		if err != nil {
-			rebateLogger.Warningf("payer:[%s] rebate:[%d] to payee:[%s] err:[%s]", payerID, rebateMoney, payee, err)
+			rebateLogger.Printf("payer:[%s] rebate:[%d] to payee:[%s] err:[%s]", payerID, rebateMoney, payee, err)
 			return nil, err
 		}
-		rebateLogger.Warningf("payer:[%s] rebate:[%d] to payee:[%s], balance:[%d]", payerID, rebateMoney, payee, balance)
+		rebateLogger.Printf("payer:[%s] rebate:[%d] to payee:[%s], balance:[%d]", payerID, rebateMoney, payee, balance)
 	}
 	err = stub.PutState(payerPrefix+payerID, []byte(strconv.Itoa(balance)))
 	if err != nil {
@@ -299,7 +302,7 @@ func (r *RebateChaincode) getPayerBalance(stub *shim.ChaincodeStub, payerID stri
 	}
 	balance := 0
 	if balanceBytes == nil {
-		rebateLogger.Warningf("payer [%s] not exists. it`s the first time to deposit for him/her", payerID)
+		rebateLogger.Printf("payer [%s] not exists. it`s the first time to deposit for him/her", payerID)
 	} else {
 		balance, err = strconv.Atoi(string(balanceBytes))
 		if err != nil {
@@ -319,7 +322,7 @@ func (r *RebateChaincode) findLastN(stub *shim.ChaincodeStub, rightTxID string, 
 	for i := 0; i < n; {
 		stateBytes, err := stub.GetState(key)
 		if err != nil {
-			rebateLogger.Warningf("GetState by key:[%s] err:[%s]", key, err)
+			rebateLogger.Printf("GetState by key:[%s] err:[%s]", key, err)
 			continue
 		}
 
@@ -327,7 +330,7 @@ func (r *RebateChaincode) findLastN(stub *shim.ChaincodeStub, rightTxID string, 
 		var ai ActionInfo
 		err = json.Unmarshal(stateBytes, &ai)
 		if err != nil {
-			rebateLogger.Warningf("json unmarshal state error")
+			rebateLogger.Printf("json unmarshal state error")
 			continue
 		}
 		prevTx := ai.PrevTx
@@ -339,13 +342,13 @@ func (r *RebateChaincode) findLastN(stub *shim.ChaincodeStub, rightTxID string, 
 		key = shareTXPrefix + prevTx
 		i++
 	}
-	rebateLogger.Warningf("baneift users:[%v]", payees)
+	rebateLogger.Printf("baneift users:[%v]", payees)
 	return payees, nil
 }
 
 func main() {
 	err := shim.Start(new(RebateChaincode))
 	if err != nil {
-		rebateLogger.Warningf("Error starting RebateChaincode: [%s]", err)
+		rebateLogger.Printf("Error starting RebateChaincode: [%s]", err)
 	}
 }
